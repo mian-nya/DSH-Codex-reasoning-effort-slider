@@ -114,7 +114,7 @@ window.__ModuleLoader__.load({
       return h('svg', { className: `dsh-codex-reasoning-effort-slider-icon${small ? ' dsh-codex-reasoning-effort-slider-small' : ''}`, viewBox: '0 0 24 24', 'aria-hidden': true },
         h('path', { d: paths[name] || paths.model }));
     }
-    function Selector({ directory, load, select, available, locked, t }) {
+    function Selector({ directory, load, select, available, locked, t, labelSlot, renderSlot }) {
       const state = useSyncExternalStore(fn => directory.subscribe(fn), () => directory.getSnapshot());
       const [open, setOpen] = useState(false);
       const [present, setPresent] = useState(false);
@@ -132,9 +132,10 @@ window.__ModuleLoader__.load({
       const busyRef = useRef(false);
       const timersRef = useRef([]);
       const latest = useRef({});
+      const groups = Array.isArray(state.groups) ? state.groups : [];
       const selection = state.pending || state.current;
-      const group = state.groups.find(g => g.id === selection?.provider);
-      const model = group?.models.find(m => m.id === selection?.model);
+      const group = groups.find(g => g.id === selection?.provider);
+      const model = group?.models?.find(m => m.id === selection?.model);
       const efforts = (model?.reasoning?.efforts || []).filter(e => order.includes(e.id))
         .sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
       const savedEffort = selection?.reasoningEffort || model?.reasoning?.defaultEffort;
@@ -143,6 +144,13 @@ window.__ModuleLoader__.load({
       const fraction = efforts.length > 1 ? index / (efforts.length - 1) : 0;
       const ultra = displayed === 'max';
       const modelName = model?.name || selection?.model || t('choose');
+      const label = (option, placement, chosen = false) => {
+        const fallback = option?.name || modelName;
+        if (!labelSlot || typeof renderSlot !== 'function' || !option || !group) return fallback;
+        return renderSlot('conversation.input.model.label',
+          { provider: { id: group.id, name: group.name }, model: option, placement, selected: chosen },
+          { fallback });
+      };
       const disabled = Boolean(locked || !available);
       const motion = useRef({ speed: 0, from: 0, target: 0, changedAt: 0, travel: 0, burst: 0 });
       latest.current = { open: present, fast, ultra, pane };
@@ -387,24 +395,25 @@ window.__ModuleLoader__.load({
         options[next].scrollIntoView({ block: 'nearest' });
       }
       const classes = `dsh-codex-reasoning-effort-slider-popup${!open ? ' closed' : ''}${ultra ? ' ultra' : ''}${fast ? ' fast-mode' : ''}${message ? ' message' : ''}`;
-      const status = error || state.error || '';
+      const status = error || (typeof state.error === 'string' ? state.error : state.error?.message || '');
       const currentLabel = labels[displayed] || state.retainedEffort || '';
       const triggerLabel = labels[savedEffort] || state.retainedEffort || '';
-      const modelCount = state.groups.reduce((count, provider) => count + provider.models.length, 0);
-      const menuHeight = 34 + Math.max(1, modelCount) * 30 + (state.groups.length > 1 ? state.groups.length * 22 : 0);
+      const modelCount = groups.reduce((count, provider) => count + (provider.models?.length || 0), 0);
+      const menuHeight = 34 + Math.max(1, modelCount) * 30 + (groups.length > 1 ? groups.length * 22 : 0);
       const modelsView = h('div', { className: `dsh-codex-reasoning-effort-slider-pane dsh-codex-reasoning-effort-slider-models${pane !== 'models' ? ' hidden' : ''}`,
         role: 'menu', 'aria-label': t('model'), inert: pane !== 'models' ? '' : undefined, onKeyDown: modelKeyDown },
         h('div', { className: 'dsh-codex-reasoning-effort-slider-menu-title' }, t('choose'),
           h('button', { className: 'dsh-codex-reasoning-effort-slider-menu-back', role: 'menuitem', 'aria-label': t('back'), title: t('back'), onClick: () => setPane('effort') }, icon('back', true))),
-        ...state.groups.map(provider => h('div', { key: provider.id },
-          state.groups.length > 1 ? h('div', { className: 'dsh-codex-reasoning-effort-slider-group' }, provider.name) : null,
-          ...provider.models.map(option => h('button', {
+        ...groups.map(provider => h('div', { key: provider.id },
+          groups.length > 1 ? h('div', { className: 'dsh-codex-reasoning-effort-slider-group' }, provider.name) : null,
+          ...(provider.models || []).map(option => h('button', {
             key: option.id, className: 'dsh-codex-reasoning-effort-slider-option', role: 'menuitemradio',
             'aria-checked': selection?.provider === provider.id && selection?.model === option.id,
             disabled: busy, onClick: () => chooseModel(provider.id, option)
-          }, h('span', { className: 'dsh-codex-reasoning-effort-slider-option-name', title: option.name }, option.name),
+          }, h('span', { className: 'dsh-codex-reasoning-effort-slider-option-name', title: option.name },
+            label(option, 'option', selection?.provider === provider.id && selection?.model === option.id)),
           selection?.provider === provider.id && selection?.model === option.id ? icon('check', true) : null)))),
-        !state.groups.length ? h('div', { className: 'dsh-codex-reasoning-effort-slider-status' }, state.status === 'loading' ? t('loading') : t('empty')) : null);
+        !groups.length ? h('div', { className: 'dsh-codex-reasoning-effort-slider-status' }, state.status === 'loading' ? t('loading') : t('empty')) : null);
       return h('div', { className: 'dsh-codex-reasoning-effort-slider-root', ref: rootRef, 'data-dsh-codex-reasoning-effort-slider-session': true },
         h('style', null, styles),
         h('button', { className: `dsh-codex-reasoning-effort-slider-trigger${savedEffort === 'max' ? ' ultra' : ''}`, ref: triggerRef, disabled,
@@ -416,7 +425,7 @@ window.__ModuleLoader__.load({
         }, fast ? h('svg', { className: 'dsh-codex-reasoning-effort-slider-trigger-bolt', viewBox: '0 0 24 24', 'aria-hidden': true },
           h('path', { d: 'M14.4 2Q16 .2 15.8 2.5L15.1 8.5H20.5Q22 8.5 21 9.8L10.7 21.7Q9 23.4 9.2 21.2L10 14.2H4.2Q2.6 14.2 3.6 12.9L14.4 2Z' })) : null,
         h('span', { className: 'dsh-codex-reasoning-effort-slider-compact' }, icon('model')),
-        h('span', { className: 'dsh-codex-reasoning-effort-slider-caption' }, modelName,
+        h('span', { className: 'dsh-codex-reasoning-effort-slider-caption' }, label(model, 'trigger', true),
           triggerLabel ? h('span', { className: 'dsh-codex-reasoning-effort-slider-trigger-effort' }, ` ${triggerLabel}`) : null), icon('down', true)),
         h('section', { className: classes, ref: popupRef, role: 'dialog', 'aria-label': pane === 'models' ? t('model') : t('effort'),
           'aria-hidden': !open, inert: !open ? '' : undefined, style: { '--dsh-codex-reasoning-effort-slider-height': `${pane === 'models' ? menuHeight : 104}px` } },
@@ -429,7 +438,7 @@ window.__ModuleLoader__.load({
                 h('span', null, t('fast')), h('span', null, t('usage')), h('span', null, t('visual')))),
             h('button', { className: 'dsh-codex-reasoning-effort-slider-model-link', onClick: () => setPane('models'), 'aria-label': t('model'), title: modelName },
               h('span', { className: 'dsh-codex-reasoning-effort-slider-heading' }, currentLabel || t('choose'), icon('chevron', true)),
-              h('span', { className: 'dsh-codex-reasoning-effort-slider-model' }, modelName)),
+              h('span', { className: 'dsh-codex-reasoning-effort-slider-model' }, label(model, 'menu', true))),
             h('div', { className: 'dsh-codex-reasoning-effort-slider-warning' }, h('span', null, t('warning'))),
             h('button', { className: 'dsh-codex-reasoning-effort-slider-tool dsh-codex-reasoning-effort-slider-reset', disabled: busy || !model?.reasoning, 'aria-label': t('reset'),
               onClick: () => { setFast(false); chooseEffort(model?.reasoning?.defaultEffort); }
@@ -454,23 +463,45 @@ window.__ModuleLoader__.load({
             h('button', { className: 'dsh-codex-reasoning-effort-slider-menu-back', 'aria-label': t('retry'), title: t('retry'),
               onClick: () => { setError(''); load(); } }, icon('reset', true))) : null));
     }
+    const LABEL_CHILDREN = {
+      'conversation.input.model.label': { kind: 'single', scope: 'session', inline: true }
+    };
     return {
       inject: ['slots', 'modelDirectories', 'sessions', 'locale', 'remote', 'remote.session'],
       apply(ctx) {
         ctx.effect(() => ctx.locale.register(NS, { zh, en }));
-        ctx.slots.inject('conversation.input.model', () => ctx.slots.register({
+        const seat = children => ctx.slots.register({
           name: 'conversation.input.model',
           locale: NS,
+          // SlotCore election renders the lowest priority and only rejects a second
+          // registration at the SAME priority. The shipped model-selection seat sits
+          // at the default 0, so -1 shadows it cleanly instead of throwing.
+          priority: -1,
+          ...(children ? { children } : {}),
           inject(sessionId) {
             const directory = ctx.modelDirectories.directoryFor(sessionId);
-            const available = ctx.sessions.subagentAddress(sessionId) === undefined;
+            const available = typeof ctx.sessions.subagentAddress !== 'function'
+              || ctx.sessions.subagentAddress(sessionId) === undefined;
             return {
-              available, directory: directory.store,
+              available, labelSlot: Boolean(children), directory: directory.store,
               load: () => { if (available) directory.load().catch(() => {}); },
               select: selection => available ? directory.select(selection) : Promise.resolve(undefined)
             };
           }
-        }, Selector));
+        }, Selector);
+        ctx.slots.inject('conversation.input.model', () => {
+          // Since DSH 0.2.1 the seat owns a `label` child slot. Declare it when it is
+          // still free so label decorators keep rendering inside this trigger; when
+          // the shipped seat already declared it, fall back to a plain model name.
+          const taken = typeof ctx.slots.spec === 'function'
+            && ctx.slots.spec('conversation.input.model.label') !== undefined;
+          try {
+            return seat(taken ? undefined : LABEL_CHILDREN);
+          } catch (error) {
+            if (!/is already declared/.test(String(error?.message))) throw error;
+            return seat(undefined);
+          }
+        });
       }
     };
   }

@@ -1,6 +1,6 @@
 {
   "name": "@local/dsh-codex-reasoning-effort-slider",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "author": "Nachoneko_miao",
   "description": "Replicate the Codex desktop version's reasoning depth adjustment slider 1:1 in DeepSeek Harness.",
   "private": true,
@@ -13,20 +13,32 @@
     "./package.json": "./package.json",
     "./locale/*.json": "./locale/*.json"
   },
-  "files": ["index.js", "client.js", "cordis.patch.yml", "icon.svg", "locale", "README.md", "LICENSE"],
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "icon.svg",
+    "locale",
+    "README.md",
+    "LICENSE"
+  ],
   "peerDependencies": {
-    "@deepseek-ai/dsh": "0.2.0-rc.2"
+    "@deepseek-ai/dsh": ">=0.2.0-rc.2 <0.3.0"
   },
   "dsh": {
-    "bundle": { "patch": "./cordis.patch.yml" },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
     "client": {
       "platform": "web",
       "immediately": true,
       "inject": [
         "@deepseek-ai/dsh-client-ui-conversation",
         "@deepseek-ai/dsh-client-ui-model-selection",
+        "@deepseek-ai/dsh-client-ui-slots",
         "@deepseek-ai/dsh-client-locale"
       ]
-    }
+    },
+    "manifestVersion": 1
   }
 }

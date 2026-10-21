@@ -23,7 +23,9 @@ B 站视频演示：。
 
 ## 安装方法
 
-仅在Windows 11上的DeepSeek Harness Desktop **0.2.0-rc.2**测试通过，其他设备有待测试。
+已在 Windows 11 的 DeepSeek Harness Desktop **0.2.0-rc.2** 与 macOS 的 **0.2.1-rc.2** 上测试通过，其他平台有待测试。
+
+> 兼容性说明：自 **0.2.1-rc.2** 起，输入栏的 `conversation.input.model` 槽位被官方模型选择器以优先级 0 占用，本插件改为以优先级 `-1` 注册（SlotCore 中优先级最低者渲染），因此可以正常覆盖官方选择器而不会与官方注册冲突；0.2.1 新增的 `conversation.input.model.label` 子槽位若仍空闲，本插件会自行声明并在按钮中渲染（例如 DeepSeek-V4.1-Flash 的 1017 标签），若已被官方占用则自动降级为纯模型名。`peerDependencies` 已放宽为 `>=0.2.0-rc.2 <0.3.0`。
 
 通过 Harness 官方的插件管理页面安装，无需命令行：
 
